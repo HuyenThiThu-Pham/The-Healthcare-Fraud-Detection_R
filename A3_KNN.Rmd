@@ -1,0 +1,249 @@
+---
+title: "Assignment3- Naive Bayes"
+output: html_notebook
+---
+
+
+
+```{r}
+library(e1071)
+library(caret)
+library(ggplot2)
+library(class)
+library(lattice)
+library(mlr3)
+library(mlr3learners)
+library(mlr3measures)
+library(dplyr)
+```
+
+
+
+```{r}
+# Load data
+data <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+```{r}
+str(data)
+```
+
+
+```{r}
+data <- subset(data, select = -c(1,2,4,6,9,10,11,12,13,14,15,16,17,18,19,23,30,31))
+```
+
+
+
+```{r}
+summary(data)
+```
+```{r}
+str(data)
+```
+
+Task 1. K-Nearest Neighbor classifier
+
+KNN is a supervised machine learning algorithm that
+classifies a new data point into the target class, depending on the features of its neighboring data
+points. It is one of the most simple machine learning algorithms and it can be easily implemented
+for a varied set of problems. The algorithm is mainly based on feature similarity. That is, KNN
+checks how similar a data point is to its neighbor and classifies the data point into the class it is
+most similar to.
+KNN is a lazy algorithm, this means that it memorizes the training data set instead of learning a
+discriminative function from the training data. It is applicable in solving both classification and
+regression problems.
+
+
+Data Preprocessing:
+
+Convert PotentialFraud to a factor to ensure the Naive Bayes model treats it as a categorical variable.
+
+
+```{r}
+# Convert PotentialFraud to a factor
+data$PotentialFraud <- as.factor(data$PotentialFraud)
+
+```
+
+Being a distance-based algorithm, KNN is affected by the
+scale of the variables. Similar to K-Means, a commonly used clustering algorithm.
+There are many ways to scale your variables and we will use a simple, step by step approach, as
+per below.
+
+
+```{r}
+# Scale the numerical features
+data$Race <- scale(data$Race, center = TRUE, scale = TRUE)
+data$State <- scale(data$State, center = TRUE, scale = TRUE)
+data$County <- scale(data$County, center = TRUE, scale = TRUE)
+data$Age <- scale(data$Age, center = TRUE, scale = TRUE)
+data$ClaimPeriod <- scale(data$ClaimPeriod, center = TRUE, scale = TRUE)
+data$AdmissionPeriod <- scale(data$AdmissionPeriod, center = TRUE, scale = TRUE)
+data$count_BeneID <- scale(data$count_BeneID, center = TRUE, scale = TRUE)
+data$mean_InscClaimAmtReimbursed <- scale(data$mean_InscClaimAmtReimbursed, center = TRUE, scale = TRUE)
+data$mean_TotalReimbursementAmt <- scale(data$mean_TotalReimbursementAmt, center = TRUE, scale = TRUE)
+data$mean_TotalDeductibleAmt <- scale(data$mean_TotalDeductibleAmt, center = TRUE, scale = TRUE)
+data$Total_physician_attend <- scale(data$Total_physician_attend, center = TRUE, scale = TRUE)
+data$Total_diagnoses <- scale(data$Total_diagnoses, center = TRUE, scale = TRUE)
+```
+
+```{r}
+str(data)
+```
+
+Split the data into training (70%) and testing (30%) sets using a random sample.
+
+```{r}
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train.size <- .7
+train.indices <- sample(x = seq(1, nrow(data), by = 1), size =
+ceiling(train.size * nrow(data)), replace = FALSE)
+fraud.data.train <- data[ train.indices, ]
+fraud.data.test <- data[ -train.indices, ]
+
+```
+
+
+
+
+
+KNN
+
+A critical aspect with KNN (again, similar to K-Means) is finding an optimal value for K, the
+number of neighbors to consider. One way to find an optimal value is to try a range of options.
+The code below creates a new Task (as we will be using mlr3 package), prepares a range of K
+values to be tested and plots accuracy of the models obtained with different K-values.
+
+
+
+Define the task and learner:
+Iterate over different values of k:
+Evaluate the model:
+Plot the results:
+```{r}
+fraud.task <- TaskClassif$new(id = "fraud", backend = fraud.data.train,
+target = "PotentialFraud")
+# run experiment
+k.values <- c(1, 25, 50, 75, 100)
+storage <- data.frame(matrix(NA, ncol = 4, nrow = length(k.values)))
+colnames(storage) <- c("accuracy", "precision", "recall", "k")
+# Perform 5-fold cross-validation
+resampling <- rsmp("cv", folds = 2)
+
+for (i in seq_along(k.values)) {
+  k <- k.values[i]
+  fraud.learner <- lrn("classif.kknn", k = k)
+  
+  # Resample the model on the task using cross-validation
+  resample_result <- resample(fraud.task, fraud.learner, resampling)
+  
+  # Get cross-validated measures
+  scores <- resample_result$score(msrs(c("classif.acc", "classif.precision", "classif.recall")))
+  
+  # Store the results
+  storage[i, ] <- c(mean(scores$classif.acc), mean(scores$classif.precision), mean(scores$classif.recall), k)
+}
+
+# Find the optimal k based on accuracy
+optimal_k <- storage$k[which.max(storage$accuracy)]
+
+# Display the results
+print(storage)
+print(paste("Optimal k:", optimal_k))
+```
+
+
+
+
+
+
+```{r}
+plot(
+  x = storage$k, y = storage$accuracy, main = "Overfitting behavior KNN",
+  xlab = "k - the number of neighbors to consider", ylab = "accuracy",
+  col = "blue", type = "l",
+  xlim = rev(range(storage$k)),
+  ylim = c(
+    min(na.omit(c(storage$accuracy, storage$precision))),  # Filter out NA values
+    max(na.omit(c(storage$accuracy, storage$precision)))   # Filter out NA values
+  ),
+  log = "x"
+)
+lines(x = storage$k, y = storage$precision, col = "orange")
+legend("topleft", c("precision", "accuracy"), col = c("orange", "blue"), lty = 1)
+
+```
+
+
+
+This is the type of plot we discussed in previous weeks. What we can see is that for smaller
+values of K (less than 10), the obtained models tend to overfit the data. It seems, from the plot
+above, that value of 30 is the optimal value for the number of neighbors to consider. Please note
+that you are more than welcome to try other options as well.
+
+
+
+```{r}
+# Fit KNN with K=100
+fraud.learner.knn <- lrn("classif.kknn", k = 100)
+fraud.learner.knn$train(task = fraud.task)
+fraud.pred.knn <- fraud.learner.knn$predict_newdata(newdata = fraud.data.test)
+knn.results = confusionMatrix(table(predicted = fraud.pred.knn$response,
+actual = fraud.data.test$PotentialFraud))
+knn.results
+```
+
+
+KNN try with different k.value
+
+
+
+```{r}
+fraud.task <- TaskClassif$new(id = "fraud", backend = fraud.data.train,
+target = "PotentialFraud")
+# run experiment
+k.values <- c(1, 10, 20, 30, 40)
+storage <- data.frame(matrix(NA, ncol = 4, nrow = length(k.values)))
+colnames(storage) <- c("accuracy", "precision", "recall", "k")
+# Perform 5-fold cross-validation
+resampling <- rsmp("cv", folds = 2)
+
+for (i in seq_along(k.values)) {
+  k <- k.values[i]
+  fraud.learner <- lrn("classif.kknn", k = k)
+  
+  # Resample the model on the task using cross-validation
+  resample_result <- resample(fraud.task, fraud.learner, resampling)
+  
+  # Get cross-validated measures
+  scores <- resample_result$score(msrs(c("classif.acc", "classif.precision", "classif.recall")))
+  
+  # Store the results
+  storage[i, ] <- c(mean(scores$classif.acc), mean(scores$classif.precision), mean(scores$classif.recall), k)
+}
+
+# Find the optimal k based on accuracy
+optimal_k <- storage$k[which.max(storage$accuracy)]
+
+# Display the results
+print(storage)
+print(paste("Optimal k:", optimal_k))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
