@@ -1,0 +1,449 @@
+---
+title: "Assignment3- Decision_tree validation model"
+output: html_notebook
+---
+Reference practice 7
+
+
+
+```{r}
+# Load required packages
+library(caret)
+library(pROC)
+library(ggplot2)
+library(dplyr)
+library(rpart)
+
+```
+
+
+```{r}
+# Load data
+data <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+
+
+```{r}
+data <- subset(data, select = -c(1,2,4,6,9,10,11,12,13,14,15,16,17,18,19,23,30,31))
+```
+
+
+
+```{r}
+str(data)
+```
+
+
+
+Decision Tree
+
+
+
+
+```{r}
+categorical_columns <- c("PotentialFraud", "Race")
+
+# Convert these columns to factors
+data[categorical_columns] <- lapply(data[categorical_columns], as.factor)
+
+# Verify the structure of the data to ensure the conversion is correct
+str(data)
+
+```
+
+
+```{r}
+# Data Partitioning
+# Create training and test sets
+set.seed(1000)
+data.class <- data
+train_index <- sample(1:nrow(data.class), 0.7 * nrow(data.class))
+train <- data.class[train_index, ]
+test <- data.class[-train_index, ]
+
+list( train = summary(train), test = summary(test) )
+```
+
+method = "class": This specifies that the model is a classification tree. 
+If it were a regression tree, you would use method = "anova".
+
+cp=0: This is the complexity parameter. It’s used to control the size of the decision tree and to prevent overfitting. A smaller cp will lead to a larger tree, which might fit the training data more closely, but may not generalize well to new data. In this case, setting cp=0 means the tree will keep splitting until all leaves are pure or until the splits do not improve the fit by a factor of cp.
+
+default maxdepth = 30, minsplit = 20, cp = 0.01
+
+```{r}
+# Exploring Parameters
+
+
+# Define the formula for the model
+formula <- PotentialFraud ~ . 
+
+# Build the decision tree with parameters
+# Complexity Parameter, is used to control tree complexity, hence preventing overfitting. A smaaler cp will lead to a larger tree.
+# minsplit control th minimum number of observations that must exist in a node in order for a split to be attemped. A larger minsplit will result in fewer splits, leading to a simpler.
+# maxdepth control the maximum depth of any node of the final tree, with the root node counted as depth 0. Depth is length of the longest path from a tree node to the root. The smaller maxdepth will result i a simpler model.
+
+tree_model <- rpart(formula, data = train, method = "class",
+                    control = rpart.control(cp = 0.01, maxdepth = 10, minsplit = 20))
+
+```
+
+```{r}
+# Predict on the test set
+predictions <- predict(tree_model, test, type = "class")
+
+```
+
+```{r}
+# Evaluate the model
+confusionMatrix(predictions, test$PotentialFraud)
+```
+
+```{r}
+# Visualize the tree structure
+printcp(tree_model)
+```
+
+
+```{r}
+plotcp(tree_model)
+```
+
+
+```{r}
+
+
+tree_model <- rpart(formula, data = train, method = "class",
+                    control = rpart.control(cp = 0.001, maxdepth = 10, minsplit = 10))
+
+```
+
+
+```{r}
+plotcp(tree_model)
+```
+
+
+```{r}
+# Predict on the test set
+predictions <- predict(tree_model, test, type = "class")
+
+```
+
+```{r}
+# Evaluate the model
+confusionMatrix(predictions, test$PotentialFraud)
+```
+```{r}
+# Exploring Parameters
+
+
+tree_model <- rpart(formula, data = train, method = "class",
+                    control = rpart.control(cp = 0.001, maxdepth = 10, minsplit = 5))
+
+```
+
+
+
+```{r}
+# Predict on the test set
+predictions <- predict(tree_model, test, type = "class")
+# Evaluate the model
+confusionMatrix(predictions, test$PotentialFraud)
+```
+
+
+
+```{r}
+# Exploring Parameters
+
+
+tree_model <- rpart(formula, data = train, method = "class",
+                    control = rpart.control(cp = 0.001, maxdepth = 5, minsplit = 5))
+
+```
+
+
+
+```{r}
+# Predict on the test set
+predictions <- predict(tree_model, test, type = "class")
+# Evaluate the model
+confusionMatrix(predictions, test$PotentialFraud)
+```
+
+```{r}
+plotcp(tree_model)
+```
+
+
+
+
+```{r}
+
+# Calculate performance indicators
+library(caret)
+pred <- predict(tree_model, newdata = test, type = "class")
+conf_mat <- confusionMatrix(pred, test$PotentialFraud)
+print(conf_mat$overall) # accuracy, kappa, etc.
+print(conf_mat$byClass) # sensitivity, specificity, etc.
+
+
+```
+
+
+
+```{r}
+# Discuss the most predictive variables
+print(varImp(tree_model))
+
+```
+
+
+
+
+
+
+
+```{r}
+library(rattle)
+library(tibble)
+library(bitops)
+# Plot the tree
+fancyRpartPlot(tree_model, palettes = c("Greens", "Reds"), sub = "")
+```
+
+
+
+```{r}
+# Build the decision tree with parameters
+tree_model.full <- rpart(formula, data = train, method = "class",
+                    control = rpart.control(cp = 0, maxdepth = 5, minsplit = 20))
+
+
+
+fancyRpartPlot(tree_model.full, palettes = c("Greens", "Reds"), sub = "")
+```
+
+
+
+```{r}
+# Prune decision tree
+p.tree.prune <- prune(tree_model.full, cp = tree_model.full$cptable[which.min(tree_model.full$cptable[,"xerror"]),"CP"])
+```
+```{r}
+plotcp(p.tree.prune)
+
+```
+```{r}
+# Prune decision tree
+min_cp <- tree_model.full$cptable[which.min(tree_model.full$cptable[,"xerror"]),"CP"]
+p.tree.prune <- prune(tree_model.full, cp = min_cp)
+
+# Print the cp value
+print(paste("The cp value used for pruning is:", min_cp))
+
+```
+
+
+```{r}
+fancyRpartPlot(p.tree.prune, palettes = c("Greens", "Reds"), sub = "")
+```
+
+ 
+```{r}
+# Make a prediction
+fraud.predict <- predict(p.tree.prune, test, type = "class")
+```
+
+```{r}
+# Print confusion matrix
+table(fraud.predict, test$PotentialFraud)
+```
+
+```{r}
+confusion_table <-table(fraud.predict, test$PotentialFraud)
+confusion_table
+```
+
+
+```{r}
+correct <- confusion_table |> diag() |>sum()
+correct
+```
+
+```{r}
+error <- confusion_table |>sum() - correct
+error
+```
+
+```{r}
+accuracy <- correct /(correct + error )
+accuracy
+```
+
+```{r}
+# function for accuracy
+accuracy <- function(truth, prediction){
+  tbl <- table(truth, prediction)
+  sum(diag(tbl))/sum(tbl)
+}
+accuracy(test$PotentialFraud, fraud.predict)
+```
+
+Get a confusio table with more statistics (using caret)
+```{r}
+confusionMatrix(data=fraud.predict, reference = test |>pull(PotentialFraud))
+```
+
+
+Task 3. The ROC curve
+
++  pre-processing:
+
+evaluating a classification model, particularly a decision tree model (p.tree.prune)
+
+It's a binary classifier since you're using the second column of predicted probabilities.
+
+type = "prob": This argument tells the predict() function to output probabilities rather than class predictions. For classification models, this allows you to get the probability of each class for each observation.
+
+[ ,2]: This part of the code indicates that you're extracting the probabilities of the second class.
+
+
+```{r}
+# Calculating the probabilities of the positive class for the observations in the test dataset according to the decision tree model 
+# 0: negative class
+# 1: positive class
+
+prob.fraud = predict(p.tree.prune, newdata = test, type = "prob")[,"1"] 
+
+```
+
+using roc() function from package 'pROC' to compute the Receiver Operating Characteristic (ROC) curve.
+
+```{r}
+res.roc <- roc(test$PotentialFraud, prob.fraud)
+```
+
+plot AUC: Area Under the Curve.
+
+```{r}
+
+plot.roc(res.roc, print.auc = TRUE)
+```
+
+```{r}
+# Adding the best threshold value
+plot.roc(res.roc, print.auc = TRUE, print.thres = "best")
+```
+
+Model Evaluation
+ROC: Receiver Operating Characteristic
+ROC curve plots False positive rate (x-axis)  against true positive rate (y-axis)
+
+```{r}
+# Extract thresholds, sentitivities, specificities
+roc.data <- tibble(
+  thresholds = res.roc$thresholds,
+  sensitivity = res.roc$sensitivities,
+  specificity = res.roc$specificities
+)
+roc.data
+
+```
+
+
+```{r}
+# Get the probality threshold for specificity = 0.6
+roc.data %>% filter(specificity >= 0.6)
+```
+
+
+Task 4. Cross validation
+
+
+trainControl() is used to choose how testing is performed.
+
+```{r}
+# Loading required packages
+library(caret)
+library(rpart.plot)
+```
+
+K-fold cross-validation
+defining training control as cross-validation and value of K equal to 10
+
+```{r}
+# Set up caret to perform 10-fold cross validation
+cv.control <- trainControl(method = "cv",
+number = 10)
+
+```
+
+
+rpart(formula, data, weights, subset, na.action = na.rpart, method,
+      model = FALSE, x = FALSE, y = TRUE, parms, control, cost, ...)
+      
+      
+The package caret combines training and validation for hyperparameter tuning into a single function called train(). It internally splits the data into training and validation sets and thus will provide you with error estimates for different hyperparameter settings.
+
+```{r}
+# Use caret to train the rpart decision tree using 10-fold cross
+# validation and use 15 values for tuning the cp parameter for rpart.
+# This code returns the best model.
+rpart.cv <- train(PotentialFraud ~ .,
+data = train,
+method = "rpart",
+trControl = cv.control,
+tuneLength = 15)
+```
+
+```{r}
+rpart.cv
+```
+
+
+Combine 2 command above in 1:
+For rpart, train tries to tune the cp parameter (tree complexity) using accuracy to chose the best model.
+Parameters used for tuning (in this case cp) need to be set using a data.frame in the argument tuneGrid! Setting it in control will be ignored.
+
+```{r}
+rpart.cv1 <- train(PotentialFraud ~  mean_InscClaimAmtReimbursed, mean_TotalReimbursementAmt, mean_TotalDeductibleAmt, State, County, AdmissionPeriod,
+                    data = train,
+                    method = "rpart",
+                    
+                    trControl = trainControl(method = "cv", number = 10),
+                    tuneLength = 15)
+rpart.cv1
+```
+
+
+```{r}
+# Plot model selection
+plot((rpart.cv1))
+plot(rpart.cv)
+```
+
+A model using the best tuning parameters and using all the data supplied to train() is available as fit$finalModel.
+extra = 2 : box wider *2
+
+```{r}
+rpart.plot(rpart.cv1$finalModel, extra = 2,
+  box.palette = list("Gy", "Gn", "Bu", "Bn", "Or", "Rd", "Pu"))
+```
+The variable importance without competing splits.
+```{r}
+imp <- varImp(rpart.cv1, compete = FALSE)
+imp
+```
+```{r}
+ggplot(imp)
+```
+
+
+
+
+
+
+
