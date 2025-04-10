@@ -1,0 +1,91 @@
+---
+title: "A3_visualisation"
+output: html_notebook
+---
+
+```{r}
+# Load data
+data <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+```{r}
+str(data)
+```
+
+```{r}
+# Convert PotentialFraud to a factor
+data$PotentialFraud <- as.factor(data$PotentialFraud)
+```
+
+
+```{r}
+library(ggplot2)
+
+# Create a box plot using ggplot2
+ggplot(data, aes(x = data$PotentialFraud, y = data$mean_InscClaimAmtReimbursed)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  labs(title = "Box Plot of mean_InscClaimAmtReimbursed by PotentialFraud", x = "PotentialFraud", y = "mean_InscClaimAmtReimbursed") +
+  theme_minimal()
+
+```
+
+```{r}
+# Create a box plot using ggplot2
+ggplot(data, aes(x = data$PotentialFraud, y = data$mean_TotalReimbursementAmt)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  labs(title = "Box Plot of mean_TotalReimbursementAmt by PotentialFraud", x = "PotentialFraud", y = "mean_ITotalReimbursementAmt") +
+  theme_minimal()
+```
+
+```{r}
+# Create a box plot using ggplot2
+ggplot(data, aes(x = data$PotentialFraud, y = data$mean_TotalDeductibleAmt)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  labs(title = "Box Plot of mean_TotalDeductibleAmt by PotentialFraud", x = "PotentialFraud", y = "mean_ITotalDeductibleAmt") +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(data, aes(x = PotentialFraud, y = mean_TotalReimbursementAmt, fill = PotentialFraud)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_manual(values = c("lightgreen", "lightblue")) +
+  labs(title = "Average Total Reimbursement Amount by Potential Fraud", 
+       x = "Potential Fraud", 
+       y = "mean_TotalReimbursementAmt") +
+  theme_minimal()
+```
+```{r}
+ggplot(data, aes(x = PotentialFraud, y = mean_TotalDeductibleAmt, fill = PotentialFraud)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_manual(values = c("lightgreen", "lightblue")) +
+  labs(title = "Average Total Deductible Amount by Potential Fraud", 
+       x = "Potential Fraud", 
+       y = "mean_TotalDeductibleAmt") +
+  theme_minimal()
+```
+```{r}
+ggplot(data, aes(x = PotentialFraud, y = mean_InscClaimAmtReimbursed, fill = PotentialFraud)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_manual(values = c("lightgreen", "lightblue")) +
+  labs(title = "Average Insurance Reimbursement Amount by Potential Fraud", 
+       x = "Potential Fraud", 
+       y = "mean_InscClaimAmtReimbursed") +
+  theme_minimal()
+```
+```{r}
+data <- subset(data, select = -c(1,2,4,6,9,10,11,12,13,14,15,16,17,18,19,23,30,31))
+```
+
+```{r}
+str(data)
+```
+```{r}
+# Specify the file path where you want to save the CSV file
+file_path <- "/Users/huyenpham/Desktop/DSE_A1/a3_feature_selection.csv"
+
+
+# Write the dataframe to a CSV file
+write.csv(data, file = file_path, row.names = FALSE)
+```
