@@ -1,0 +1,211 @@
+
+Assignment 3
+
+```{r}
+# Load required packages
+library(caret)
+library(pROC)
+library(rpart.plot)
+library(mlbench)
+library(dplyr)
+
+```
+
+
+
+```{r}
+train_final_dataset <- read.csv("merged_df.csv")
+```
+
+```{r}
+View(train_final_dataset)
+```
+
+```{r}
+# Replace NA with 0 for specific columns
+columns_to_replace <- c("DeductibleAmtPaid", "ClmDiagnosisCode_1", "ClmDiagnosisCode_2", "ClmDiagnosisCode_3", 
+                        "ClmDiagnosisCode_4", "ClmDiagnosisCode_5", "ClmDiagnosisCode_6", "ClmDiagnosisCode_7",
+                        "ClmDiagnosisCode_8", "ClmDiagnosisCode_9", "ClmDiagnosisCode_10",
+                        "ClmProcedureCode_1", "ClmProcedureCode_2", "ClmProcedureCode_3", "ClmProcedureCode_4",
+                        "ClmProcedureCode_5", "ClmProcedureCode_6", "AttendingPhysician", "OperatingPhysician", "OtherPhysician", "AdmissionPeriod")
+
+train_final_dataset[columns_to_replace][is.na(train_final_dataset[columns_to_replace])] <- 0
+```
+
+
+```{r}
+
+# Identify columns with NA values
+na_columns <- sapply(train_final_dataset, function(x) sum(is.na(x)))
+na_columns <- na_columns[na_columns > 0]
+cat("Columns with NA values and their counts:\n")
+print(na_columns)
+
+```
+```{r}
+# Replace missing values with 0 for date columns
+train_final_dataset$DOD[is.na(train_final_dataset$DOD)] <- 0
+train_final_dataset$AdmissionDt[is.na(train_final_dataset$AdmissionDt)] <- 0
+train_final_dataset$DischargeDt[is.na(train_final_dataset$DischargeDt)] <- 0
+
+# Replace missing values with 0 for DiagnosisGroupCode
+train_final_dataset$DiagnosisGroupCode[is.na(train_final_dataset$DiagnosisGroupCode)] <- 0
+
+```
+
+```{r}
+# Check for NA values
+na_count <- sum(is.na(train_final_dataset))
+cat("Number of NA values:", na_count, "\n")
+```
+
+Grouping by providers, 
+we can get some useful information about a particular provider. like its annual mean of reimbursement of a particular provider, it is more than the genuine provider, then the provider must be suspected.
+we are getting the mean of provider on x_train and X_cv separately to avoid data leakage problems.
+a. InscClaimAmtReimbursed
+b. IPAnnualReimbursementAmt
+c. OPAnnualReimbursementAmt
+
+```{r}
+train_final_dataset <- train_final_dataset %>%
+  group_by(Provider) %>%
+  mutate(
+    mean_InscClaimAmtReimbursed = mean(InscClaimAmtReimbursed),
+    mean_TotalReimbursementAmt = mean(IP_OP_TotalReimbursementAmt),
+    mean_TotalDeductibleAmt = mean(IP_OP_TotalDeductibleAmt)
+  )
+```
+
+Count features.
+Getting Count of different physicians Attended a beneficiary (patient), clmDiagnosisCode and ClmProcedurecode.
+a. Count of different Physician Attended.
+b. Count of ClmDiagnosisCode
+c. Count of ClmProcedureCode.
+
+```{r}
+
+# Create a new column containing the count of physicians attended
+train_final_dataset$Total_physician_attend <- rowSums(train_final_dataset[, c("AttendingPhysician", "OperatingPhysician", "OtherPhysician")] != 0)
+
+
+```
+
+```{r}
+# Create a new column containing the count of diagnoses
+train_final_dataset$Total_diagnoses <- rowSums(train_final_dataset[, c("ClmAdmitDiagnosisCode", "DiagnosisGroupCode", paste0("ClmDiagnosisCode_", 1:10))] != 0)
+
+
+```
+
+```{r}
+train_final_dataset$Total_ChronicCond <- rowSums(train_final_dataset[, c("ChronicCond_Alzheimer", "ChronicCond_Heartfailure", "ChronicCond_KidneyDisease", "ChronicCond_Cancer", "ChronicCond_ObstrPulmonary", "ChronicCond_Depression", "ChronicCond_Diabetes", "ChronicCond_IschemicHeart", "ChronicCond_Osteoporasis", "ChronicCond_rheumatoidarthritis", "ChronicCond_stroke")] != 0)
+
+
+```
+
+```{r}
+train_final_dataset$Total_procedure <- rowSums(train_final_dataset[, c(paste0("ClmProcedureCode_", 1:6))] != 0)
+
+
+```
+
+```{r}
+View(train_final_dataset)
+```
+
+
+
+
+
+```{r}
+#saving dataframe to csv file to avoid rework
+file_path <- "/Users/huyenpham/Desktop/DSE_A1/a3_full_data2.csv"
+
+
+# Write the dataframe to a CSV file
+write.csv(train_final_dataset, file = file_path, row.names = FALSE)
+```
+
+
+
+
+```{r}
+# Drop the 
+data <- subset(train_final_dataset, select = -c(DOB, DOD, NoOfMonths_PartACov, NoOfMonths_PartBCov, ClaimStartDt, ClaimEndDt, AdmissionDt, DischargeDt, OperatingPhysician, OtherPhysician, ClmProcedureCode_1,  ClmProcedureCode_2, ClmProcedureCode_3, ClmProcedureCode_4, ClmProcedureCode_5, ClmProcedureCode_6, ClmAdmitDiagnosisCode, ClmDiagnosisCode_1, ClmDiagnosisCode_2, ClmDiagnosisCode_3, ClmDiagnosisCode_4, ClmDiagnosisCode_5, ClmDiagnosisCode_6, ClmDiagnosisCode_7, ClmDiagnosisCode_8, ClmDiagnosisCode_9, ClmDiagnosisCode_10, DiagnosisGroupCode, ChronicCond_Alzheimer, ChronicCond_Heartfailure, ChronicCond_KidneyDisease, ChronicCond_Cancer, ChronicCond_ObstrPulmonary, ChronicCond_Depression, ChronicCond_Diabetes, ChronicCond_IschemicHeart, ChronicCond_Osteoporasis, ChronicCond_rheumatoidarthritis, ChronicCond_stroke ))
+
+```
+
+
+
+```{r}
+#saving dataframe to csv file to avoid rework
+file_path <- "/Users/huyenpham/Desktop/DSE_A1/a3_data_drop.csv"
+
+
+# Write the dataframe to a CSV file
+write.csv(data, file = file_path, row.names = FALSE)
+```
+
+```{r}
+train_final_dataset <- data
+```
+
+```{r}
+str(train_final_dataset$PotentialFraud)
+str(train_final_dataset$RenalDiseaseIndicator)
+```
+```{r}
+# 
+train_final_dataset$RenalDiseaseIndicator <- ifelse(train_final_dataset$RenalDiseaseIndicator == 'Y', '1', train_final_dataset$RenalDiseaseIndicator)
+
+
+unique(train_final_dataset$RenalDiseaseIndicator)
+
+```
+```{r}
+train_final_dataset$PotentialFraud <- ifelse(train_final_dataset$PotentialFraud == 'Yes', '1', 
+                                             ifelse(train_final_dataset$PotentialFraud == 'No', '0', train_final_dataset$PotentialFraud))
+
+
+
+unique(train_final_dataset$PotentialFraud)
+```
+
+
+```{r}
+str(train_final_dataset)
+```
+
+
+
+
+
+
+```{r}
+
+# Replace numeric values in train_final_dataset
+train_final_dataset$Gender <- ifelse(train_final_dataset$Gender == 2, 0, train_final_dataset$Gender)
+
+```
+
+
+
+
+```{r}
+str(train_final_dataset)
+```
+
+
+```{r}
+# Check the structure of the modified dataframe
+dim(train_final_dataset)
+```
+
+```{r}
+# Specify the file path where you want to save the CSV file
+file_path <- "/Users/huyenpham/Desktop/DSE_A1/a3_dataset_drop_encoded.csv"
+
+
+# Write the dataframe to a CSV file
+write.csv(train_final_dataset, file = file_path, row.names = FALSE)
+```
