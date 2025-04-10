@@ -1,0 +1,214 @@
+---
+title: "Assignment3- Ensemble Methods"
+output: html_notebook
+---
+Reference practice 11
+
+The basic idea behind the ensemble methods is to construct multiple classifiers from the original
+data and then aggregate their predictions when classifying unknown examples.
+
+The ensemble of classifiers can be constructed in many ways (please see the textbook): i) by
+manipulating the training set, ii) by manipulating the input features, iii) by manipulating the class
+labels, and iv) by manipulating the learning algorithm.
+
+Ensemble methods work better with unstable classifiers, such as decision trees or neural networks, base classifiers that are sensitive to minor perturbations in the training set.
+
+
+
+```{r}
+# Load libraries
+library(SuperLearner)
+library(dplyr)
+library(caret)
+
+```
+
+
+```{r}
+# Load data
+data <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+
+
+
+```{r}
+data <- subset(data, select = -c(1,2,4,6,9,10,11,12,13,14,15,16,17,18,19,23,30,31))
+```
+
+
+
+```{r}
+str(data)
+```
+
+
+
+KNN
+
+so we will make sure the
+columns (features) are properly labeled. Second, since we will be using K-Nearest Neighbors, we
+will also scale the variables.
+
+
+
+
+
+```{r}
+# Scale the numerical features
+data$Race <- scale(data$Race, center = TRUE, scale = TRUE)
+data$State <- scale(data$State, center = TRUE, scale = TRUE)
+data$County <- scale(data$County, center = TRUE, scale = TRUE)
+data$Age <- scale(data$Age, center = TRUE, scale = TRUE)
+data$ClaimPeriod <- scale(data$ClaimPeriod, center = TRUE, scale = TRUE)
+data$AdmissionPeriod <- scale(data$AdmissionPeriod, center = TRUE, scale = TRUE)
+data$count_BeneID <- scale(data$count_BeneID, center = TRUE, scale = TRUE)
+data$mean_InscClaimAmtReimbursed <- scale(data$mean_InscClaimAmtReimbursed, center = TRUE, scale = TRUE)
+data$mean_TotalReimbursementAmt <- scale(data$mean_TotalReimbursementAmt, center = TRUE, scale = TRUE)
+data$mean_TotalDeductibleAmt <- scale(data$mean_TotalDeductibleAmt, center = TRUE, scale = TRUE)
+data$Total_physician_attend <- scale(data$Total_physician_attend, center = TRUE, scale = TRUE)
+data$Total_diagnoses <- scale(data$Total_diagnoses, center = TRUE, scale = TRUE)
+```
+
+```{r}
+head(data)
+str(data)
+```
+
+
+```{r}
+# Split the data into training and testing sets
+set.seed(123)  # For reproducibility
+train.size <- .7
+train.indices <- sample(x = seq(1, nrow(data), by = 1), size =
+ceiling(train.size * nrow(data)), replace = FALSE)
+train.data <- data[ train.indices, ]
+test.data <- data[ -train.indices, ]
+```
+
+
+```{r}
+dim(train.data)
+dim(test.data)
+```
+
+Just to get familiar with the available wrappers in the SuperLearner package, we can call the
+following method:
+
+```{r}
+listWrappers()
+```
+
+Building our first ensemble is rather straightforward.
+
+We simply called SuperLearner method to build an ensemble.
+- As input parameters, SuperLearner takes Y – the outcome variable or class,
+train.data[,12] – and X - all the features in our dataset, that is train.data[, -12] in this example.
+- family takes two values: i) binomial for classification, and ii) gaussian for regression.
+- In SL.library, we provide all the methods we would like to include in our ensemble.
+In this case, we opted for Kernel Support Vector Machines (KSVM), K-Nearest Neighbors, and Neural network.
+
+
+
+
+```{r}
+library(kernlab)
+
+```
+
+Let’s revisit the code below:
+- We simply called SuperLearner method to build an ensemble.
+- As input parameters, SuperLearner takes Y – the outcome variable or class,
+train.data[,12] – and X - all the features in our dataset, that is train.data[, -
+12] in this example.
+- family takes two values: i) binomial for classification, and ii) gaussian for
+regression.
+- In SL.library, we provide all the methods we would like to include in our ensemble.
+In this case, we opted for Kernel Support Vector Machines (KSVM), K-Nearest Neighbors, and Neural network.
+
+```{r}
+
+set.seed(999)
+# Fit the ensemble model
+model <- SuperLearner(train.data[, 1],
+train.data[, -1],
+family=binomial(),
+SL.library=list("SL.ksvm",
+
+"SL.nnet"))
+model
+```
+
+As we can see in the output, SuperLearner calculates the risk for deciding on the optimal model mix that will reduce the error. Coefficients show the weights for each of the models. 
+
+As we can see, Neural Network has a coefficient of zero, which means that is not weighted as part of the ensemble.
+SuperLearner also has internal cross-validation function that shows a specific contribution and variation for each of the models.
+
+```{r}
+set.seed(999)
+# Get V-fold cross-validated risk estimate
+cv.model <- CV.SuperLearner(train.data[, 1],
+                    scale(train.data[, -1]),
+                    V = 5,
+                    family=binomial(),
+                    SL.library=list("SL.ksvm",
+                                    
+                                    "SL.nnet"))
+summary(cv.model)
+```
+
+
+As we can see in the output, SuperLearner calculates the risk for deciding on the optimal model mix that will reduce the error. Coefficients show the weights for each of the models. As
+we can see, Neural Network has a coefficient of zero, which means that is not weighted as part of the ensemble.
+SuperLearner also has internal cross-validation function that shows a specific contribution and variation for each of the models.
+
+
+
+```{r}
+set.seed(999)
+# Get V-fold cross-validated risk estimate
+cv.model <- CV.SuperLearner(train.data[, 1],
+scale(train.data[, -12]),
+V = 5,
+family=binomial(),
+SL.library=list("SL.ksvm",
+"SL.knn",
+"SL.nnet"))
+summary(cv.model)
+```
+
+```{r}
+# plot the cross-validation results.
+plot(cv.model)
+```
+
+It is easy to see that the ensemble performed better than each individual model included.
+Making predictions with SuperLearner is also quite straightforward.
+
+```{r}
+predictions <- predict.SuperLearner(model, newdata = test.data[ , -1], X =
+train.data[,-1], Y = train.data[,1])
+head(predictions$pred)
+```
+
+
+As you will notice, predictions are in the form of probabilities. That means that you will need a
+cut off threshold to determine if the given instance should be classified as one or zero. This only
+needs to be done in the binomial classification case, not regression.
+Since we have a binomial problem, we can simply set a cut off of 0.50.
+```{r}
+# return predictions for each of the base models.
+head(predictions$library.predict)
+```
+
+```{r}
+# Convert probabilities to 0/1
+conv.preds <- ifelse(predictions$pred>=0.5,1,0)
+head(conv.preds)
+```
+
+```{r}
+#  obtain model evaluation metrics.
+confusionMatrix(as.factor(conv.preds), as.factor(test.data[, 12]))
+```
+
