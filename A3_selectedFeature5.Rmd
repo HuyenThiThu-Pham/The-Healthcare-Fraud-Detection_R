@@ -1,0 +1,174 @@
+---
+title: "A3-dataset2"
+output: html_notebook
+---
+
+Task 2. Feature Selection
+we use Filter approaches.
+
+```{r}
+# Load required packages
+library(caret)
+library(mlr3)
+data_select <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+```{r}
+str(data_select)
+```
+
+
+```{r}
+data_select <- subset(data_select, select = -c(1,2,6,9,10,11,12,13,14,15,16,17,18))
+
+```
+```{r}
+# Check for NA values
+na_count <- sum(is.na(data_select))
+cat("Number of NA values:", na_count, "\n")
+```
+
+```{r}
+# Preprocess the data
+data_select <- na.omit(data_select)
+```
+
+
+
+```{r}
+# Load required libraries
+library(randomForest)
+
+# Set seed for reproducibility
+set.seed(999)
+
+# Reduce the dataset size to the defined subset size
+data_subset <- data_select[sample(nrow(data_select), 10000), ]
+
+# Convert the response variable to factor if it's not already
+data_subset$PotentialFraud <- as.factor(data_subset$PotentialFraud)
+
+# Train Random Forest model
+rf_model <- randomForest(PotentialFraud ~ ., data = data_subset, ntree = 100)
+
+# Estimate variable importance
+rf_importance <- importance(rf_model)
+
+# Summarize importance
+print(rf_importance)
+```
+
+
+```{r}
+rf_importance_df <- data.frame(Feature = rownames(rf_importance), Importance = rf_importance[, 1])
+
+# Sort by importance
+rf_importance_df <- rf_importance_df[order(rf_importance_df$Importance, decreasing = TRUE), ]
+
+```
+
+
+```{r}
+library(ggplot2)
+# Plot the importance using ggplot2
+ggplot(rf_importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  xlab("Features") +
+  ylab("Importance") +
+  ggtitle("Random Forest Feature Importance") +
+  theme_minimal(base_size = 15) +
+  theme(axis.text.y = element_text(size = 8))
+```
+
+
+
+
+```{r}
+# Get column names except for those that are already factors
+non_factor_columns <- colnames(data_select)[sapply(data_select, function(x) !is.factor(x))]
+
+# Factorize non-factor columns
+data_select[, non_factor_columns] <- lapply(data_select[, non_factor_columns], as.factor)
+```
+
+
+```{r}
+library(caret)
+library(mlr3)
+library(mlr3filters)
+library(mlr3learners)
+
+filter.importance = flt("information_gain")
+
+#Create the Task object to handle a classification task
+fraud.classif.task = TaskClassif$new(id = "FraudData", backend = data_select, target = "PotentialFraud")
+
+# Calculate feature importance
+fraud.feature.importance <- filter.importance$calculate(fraud.classif.task)
+
+# Convert to a data table
+as.data.table(fraud.feature.importance)
+```
+
+
+
+
+```{r}
+library(mlr3viz)
+```
+```{r}
+# Create a plot showing the feature importance.
+autoplot(fraud.feature.importance)
+```
+
+```{r}
+library(data.table)
+# Extract feature importance scores and convert to a data frame
+feature_importance_df <- as.data.table(filter.importance)
+
+# Rename columns
+setnames(feature_importance_df, c("Feature", "Importance"))
+
+# Sort by importance
+feature_importance_df <- feature_importance_df[order(-Importance)]
+
+# Plot the importance using ggplot2
+ggplot(feature_importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  xlab("Features") +
+  ylab("Importance") +
+  ggtitle("Decision Tree Feature Importance") +
+  theme_minimal(base_size = 15) +
+  theme(axis.text.y = element_text(size = 8))
+```
+
+
+```{r}
+# Rename columns for ggplot2
+setnames(feature_importance_df, c("Feature", "Importance"))
+
+# Sort by importance
+feature_importance_df <- feature_importance_df[order(Importance, decreasing = TRUE)]
+
+# Define the number of top features to plot
+top_n <- 20
+
+# Plot the importance using ggplot2 with a color gradient
+ggplot(feature_importance_df[1:top_n, ], aes(x = Importance, y = reorder(Feature, Importance), fill = Importance)) +
+  geom_bar(stat = "identity") +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  xlab("Importance") +
+  ylab("Features") +
+  ggtitle(paste("Top", top_n, "Decision Tree Feature Importance")) +
+  theme_minimal(base_size = 15) +
+  theme(axis.text.y = element_text(size = 8))  # Adjust the size value as needed
+
+```
+
+
+```{r}
+# feature importance scores
+fraud.feature.importance$scores
+```
