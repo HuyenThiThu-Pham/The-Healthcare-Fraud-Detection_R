@@ -1,0 +1,131 @@
+---
+title: "A3-dataset2"
+output: html_notebook
+---
+
+Task 2. Feature Selection
+we use Filter approaches.
+
+```{r}
+# Load required packages
+library(caret)
+library(mlr3)
+data_select <- read.csv("a3_dataset_drop_encoded.csv")
+```
+
+```{r}
+str(data_select)
+```
+
+
+```{r}
+data_select <- subset(data_select, select = -c(1,2,6,9,10,11,12,13,14,15,16,17,18,23))
+
+```
+```{r}
+# Check for NA values
+na_count <- sum(is.na(data_select))
+cat("Number of NA values:", na_count, "\n")
+```
+
+```{r}
+# Preprocess the data
+data_select <- na.omit(data_select)
+```
+
+```{r}
+str(data_select)
+```
+
+
+
+```{r}
+# Load required libraries
+library(randomForest)
+
+# Set seed for reproducibility
+set.seed(999)
+
+# Reduce the dataset size to the defined subset size
+data_subset <- data_select[sample(nrow(data_select), 50000), ]
+
+# Convert the response variable to factor if it's not already
+data_subset$PotentialFraud <- as.factor(data_subset$PotentialFraud)
+```
+
+```{r}
+# Split data into training and test datasets. We will use 70%/30% split
+# again.
+
+dat.d <- sample(1:nrow(data_subset),size=nrow(data_subset)*0.7,replace = FALSE) #random selection of 70% data.
+train.data <- data_subset[dat.d,] # 70% training data
+test.data <- data_subset[-dat.d,] # remaining 30% test data
+```
+
+RandomForest(formula, ntree=n, mtry=FALSE, maxnodes = NULL)
+Arguments:
+- Formula: Formula of the fitted model
+- ntree: number of trees in the forest
+- mtry: Number of candidates draw to feed the algorithm. By default, it is the square of the number of columns.
+- maxnodes: Set the maximum amount of terminal nodes in the forest
+- importance=TRUE: Whether independent variables importance in the random forest be assessed
+
+```{r}
+
+
+# Train Random Forest model
+rf_model <- randomForest(PotentialFraud ~ ., data = train.data, ntree = 100)
+
+# Estimate variable importance
+rf_importance <- importance(rf_model)
+
+# Summarize importance
+print(rf_importance)
+```
+
+
+```{r}
+rf_importance_df <- data.frame(Feature = rownames(rf_importance), Importance = rf_importance[, 1])
+
+# Sort by importance
+rf_importance_df <- rf_importance_df[order(rf_importance_df$Importance, decreasing = TRUE), ]
+
+```
+
+
+```{r}
+library(ggplot2)
+# Plot the importance using ggplot2
+ggplot(rf_importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  xlab("Features") +
+  ylab("Importance") +
+  ggtitle("Random Forest Feature Importance") +
+  theme_minimal(base_size = 15) +
+  theme(axis.text.y = element_text(size = 8))
+```
+
+
+```{r}
+# Make predictions
+rf_predictions <- predict(rf_model, test.data)
+
+# Evaluate the model
+confusionMatrix(rf_predictions, test.data$PotentialFraud)
+```
+
+
+K-fold cross validation is controlled by the trainControl() function
+
+trainControl(method = "cv", number = n, search ="grid")
+arguments
+- method = "cv": The method used to resample the dataset. 
+- number = n: Number of folders to create
+- search = "grid": Use the search grid method. For randomized method, use "grid"
+Note: You can refer to the vignette to see the other arguments of the function.
+
+
+
+
+
