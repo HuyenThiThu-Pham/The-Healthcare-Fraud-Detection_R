@@ -15,7 +15,7 @@ The dataset presents a complex but insightful challenge, requiring data mining t
 ### Project Overview
 
 1. Data Exploration & Feature Selection – Analyzing the dataset, visualizing key variables, handling missing values, selecting important features, and scaling data where necessary.
-2. Building Classification Models – Implementing at least four models, such as Decision Trees, Neural Networks, SVM, Random Forests, Naïve Bayes, KNN, or Ensemble methods, with parameter tuning and performance evaluation.
+2. Building Classification Models – Implementing four models: Decision Trees, Neural Networks, SVM, Naïve Bayes, KNN methods, with parameter tuning and performance evaluation.
 3. Model Comparison & Conclusion – Evaluating models based on accuracy, precision, recall, and other performance metrics to determine the best-performing model. Feature importance analysis is conducted for the top model.
 
 This project demonstrates a systematic approach to fraud detection using machine learning techniques in R.
